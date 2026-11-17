@@ -50,6 +50,23 @@ The HTTP Request node retries failed requests up to three times, waiting 2 secon
 - Code nodes using Python
 - Convert to File (CSV)
 
+## About the Python Code Files
+
+The Python files in the `code/` directory contain the code used inside the n8n Code nodes. They are provided separately for readability, documentation, and reference.
+
+**Important:** These are n8n-specific code snippets, not standalone Python programs. They use n8n's execution context and built-in variables such as `_items`, and their output is returned using n8n's expected item structure.
+
+| File | Purpose |
+|---|---|
+| `url_generator.py` | Generates URLs for all 50 catalogue pages. |
+| `data_validation.py` | Validates book records and identifies missing or invalid fields. |
+| `duplicate_detector.py` | Detects duplicate book titles using normalized title comparisons. |
+| `duplicate_report.py` | Filters duplicate records to generate the duplicate report. |
+| `summary_report.py` | Calculates record counts and average book price for the summary report. |
+
+To run these snippets, import the n8n workflow and execute them within their respective Code nodes. They are not intended to be executed directly as regular `.py` files.
+
+
 ## Suggested repository structure
 
 ```text
