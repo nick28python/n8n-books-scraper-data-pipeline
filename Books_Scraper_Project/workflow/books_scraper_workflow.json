@@ -1,0 +1,387 @@
+{
+  "name": "books_scraper_workflow",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -304,
+        96
+      ],
+      "id": "e458fa5b-86ad-4c87-8ccf-e626ca934e61",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        144,
+        96
+      ],
+      "id": "b74fd9e5-a131-4724-bcdb-48bbef2ce7de",
+      "name": "HTTP Request",
+      "retryOnFail": true,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "first_title",
+              "cssSelector": "article.product_pod h3 a",
+              "returnValue": "attribute",
+              "attribute": "title",
+              "returnArray": true
+            },
+            {
+              "key": "prices",
+              "cssSelector": "article.product_pod .price_color",
+              "returnArray": true
+            },
+            {
+              "key": "availability",
+              "cssSelector": "article.product_pod .availability",
+              "returnArray": true
+            },
+            {
+              "key": "ratings",
+              "cssSelector": "article.product_pod p.star-rating",
+              "returnValue": "attribute",
+              "returnArray": true
+            },
+            {
+              "key": "next_page",
+              "cssSelector": "li.next a",
+              "returnValue": "attribute",
+              "attribute": "href",
+              "returnArray": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        368,
+        0
+      ],
+      "id": "ee11e528-651e-4da0-b1de-de2c5b1792a8",
+      "name": "HTML"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "\nbooks = []\n\nrating_map = {\n    \"One\": 1,\n    \"Two\": 2,\n    \"Three\": 3,\n    \"Four\": 4,\n    \"Five\": 5\n}\n\nfor item in _items:\n\n    data = item[\"json\"]\n\n    titles = data[\"first_title\"]\n    prices = data[\"prices\"]\n    availability = data[\"availability\"]\n    ratings = data[\"ratings\"]\n\n    for i in range(len(titles)):\n\n        rating_class = ratings[i][\"class\"]\n        rating = rating_map[rating_class.split()[-1]]\n        price_text = prices[i].strip()\n\n        price_value = float(price_text.replace(\"£\", \"\"))\n\n        book = {\n            \"title\": titles[i],\n            \"price\": price_text,\n            \"price_gbp\": price_value,\n            \"availability\": availability[i].strip(),\n            \"rating\": rating\n        }\n\n        books.append({\"json\": book})\n\nreturn books\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        592,
+        0
+      ],
+      "id": "01f2d21d-b96d-401c-83f8-6951e6acb04b",
+      "name": "Code in Python"
+    },
+    {
+      "parameters": {
+        "options": {
+          "fileName": "books_data.csv"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1264,
+        0
+      ],
+      "id": "de9f56a7-b9ba-4c72-b15e-3be39ac34934",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "# Loop over input items and add a new field called 'my_new_field' to the JSON of each one\n\nurls = []\n\nbase_url = \"https://books.toscrape.com/\"\n\nfor page in range(1, 51):\n\n    if page == 1:\n        url = base_url\n    else:\n        url = base_url + f\"catalogue/page-{page}.html\"\n\n    urls.append({\n        \"json\": {\n            \"page\": page,\n            \"url\": url\n        }\n    })\n\nreturn urls\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        96
+      ],
+      "id": "70cdf400-dcfc-43d0-810c-45a71f5f24e1",
+      "name": "Code in Python3"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "# Loop over input items and add a new field called 'my_new_field' to the JSON of each one\n\nfor item in _items:\n    book = item[\"json\"]\n\n    issues = []\n\n    if not book.get(\"title\"):\n        issues.append(\"Missing title\")\n\n    if not isinstance(book.get(\"price_gbp\"), (int, float)):\n        issues.append(\"Invalid price\")\n\n    if book.get(\"rating\") not in [1, 2, 3, 4, 5]:\n        issues.append(\"Invalid rating\")\n\n    if book.get(\"availability\") not in [\"In stock\"]:\n        issues.append(\"Check availability\")\n\n    book[\"validation_status\"] = \"Valid\" if not issues else \"Check\"\n    book[\"validation_issues\"] = issues\n\nreturn _items\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        0
+      ],
+      "id": "cb4f7b3e-123a-46eb-a2d4-a7ea67b698ea",
+      "name": "Code in Python4"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "# Loop over input items and add a new field called 'my_new_field' to the JSON of each one\n\n# seen_titles = set()\n\n# for item in _items:\n#     book = item[\"json\"]\n\n#     title = book[\"title\"].strip().lower()\n\n#     if title in seen_titles:\n#         book[\"duplicate_status\"] = \"Duplicate\"\n#     else:\n#         seen_titles.add(title)\n#         book[\"duplicate_status\"] = \"Unique\"\n\n# return _items\n\n\n\nseen_books = set()\n\nfor item in _items:\n    book = item[\"json\"]\n\n    title = book[\"title\"].strip().lower()\n    price = book[\"price\"].strip()\n\n    book_key = title\n\n    if book_key in seen_books:\n        book[\"duplicate_status\"] = \"Duplicate\"\n    else:\n        seen_books.add(book_key)\n        book[\"duplicate_status\"] = \"Unique\"\n\nreturn _items\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "fccf51d8-fd2b-475e-be92-870a1c2236a6",
+      "name": "Code in Python5"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "# Loop over input items and add a new field called 'my_new_field' to the JSON of each one\nerrors = []\n\nfor item in _items:\n    data = item[\"json\"]\n\n    error = data.get(\"error\", {})\n\n    errors.append({\n        \"json\": {\n            \"page\": data.get(\"page\"),\n            \"url\": data.get(\"url\"),\n            \"error_name\": error.get(\"name\"),\n            \"error_message\": error.get(\"message\", \"\")[:200],\n            \"status\": \"Failed\"\n        }\n    })\n\nreturn errors"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        368,
+        192
+      ],
+      "id": "ef26443a-f44a-4d8d-8684-be7bdd2f289c",
+      "name": "Error Logger"
+    },
+    {
+      "parameters": {
+        "options": {
+          "fileName": "scraping_errors.csv"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        592,
+        192
+      ],
+      "id": "a5d8a142-d011-4fd6-8568-cdbff3c26b99",
+      "name": "Convert to File1"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "\ntotal_books = len(_items)\n\nvalid_books = 0\ninvalid_books = 0\nunique_books = 0\nduplicate_books = 0\n\ntotal_price = 0\nprice_count = 0\n\nfor item in _items:\n    book = item[\"json\"]\n\n    if book[\"validation_status\"] == \"Valid\":\n        valid_books += 1\n    else:\n        invalid_books += 1\n\n    if book[\"duplicate_status\"] == \"Unique\":\n        unique_books += 1\n    else:\n        duplicate_books += 1\n\n    try:\n        price = float(book[\"price\"].replace(\"£\", \"\").strip())\n        total_price += price\n        price_count += 1\n    except (ValueError, AttributeError, KeyError):\n        pass\n\naverage_price = 0\n\nif price_count > 0:\n    average_price = round(total_price / price_count, 2)\n\nreport = {\n    \"total_books\": total_books,\n    \"valid_books\": valid_books,\n    \"invalid_books\": invalid_books,\n    \"unique_books\": unique_books,\n    \"duplicate_books\": duplicate_books,\n    \"average_price_gbp\": average_price\n}\n\nreturn [{\"json\": report}]\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        192
+      ],
+      "id": "cdd50853-944a-4ac8-8afe-61fbf8ebe64f",
+      "name": "summary report"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "# Loop over input items and add a new field called 'my_new_field' to the JSON of each one\n\nduplicates = []\n\nfor item in _items:\n    book = item[\"json\"]\n\n    if book[\"duplicate_status\"] == \"Duplicate\":\n        duplicates.append({\n            \"json\": {\n                \"title\": book[\"title\"],\n                \"price\": book[\"price\"],\n                \"rating\": book[\"rating\"]\n            }\n        })\n\nreturn duplicates\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        -192
+      ],
+      "id": "7a5a5b8e-a02e-4c7f-a546-0bb0e981245d",
+      "name": "Duplicate report"
+    },
+    {
+      "parameters": {
+        "options": {
+          "fileName": "duplicate_books.csv"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1488,
+        -192
+      ],
+      "id": "d354b22d-0504-423c-959b-e5748146574b",
+      "name": "Convert to File2"
+    },
+    {
+      "parameters": {
+        "options": {
+          "fileName": "summary_report.csv"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1488,
+        192
+      ],
+      "id": "60f21cc0-af5f-4b82-baad-1ede22cdddbf",
+      "name": "Convert to File3"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Code in Python3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML": {
+      "main": [
+        [
+          {
+            "node": "Code in Python",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in Python": {
+      "main": [
+        [
+          {
+            "node": "Code in Python4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        []
+      ]
+    },
+    "Code in Python3": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in Python4": {
+      "main": [
+        [
+          {
+            "node": "Code in Python5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in Python5": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "summary report",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Duplicate report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Logger": {
+      "main": [
+        [
+          {
+            "node": "Convert to File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "summary report": {
+      "main": [
+        [
+          {
+            "node": "Convert to File3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Duplicate report": {
+      "main": [
+        [
+          {
+            "node": "Convert to File2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "443df31b-de12-4566-9e34-039a00ef6b55",
+  "meta": {
+    "instanceId": "9132c79cfc5d35651841cfe8cb998c48106d7ee20dffcb8c658041358aea7af6"
+  },
+  "nodeGroups": [],
+  "id": "aPaijvHD1rzepRsa",
+  "tags": []
+}
